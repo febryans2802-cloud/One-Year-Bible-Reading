@@ -36,7 +36,7 @@ function toPassages(chapters) {
     if (book.chapters === 1) label = book.name;
     else if (g.from === g.to) label = `${book.name} ${g.from}`;
     else label = `${book.name} ${g.from}–${g.to}`;
-    return { label, query: label.replace("–", "-"), count: g.to - g.from + 1 };
+    return { label, query: label.replace("–", "-"), count: g.to - g.from + 1, bi: g.bi, from: g.from, to: g.to };
   });
 }
 
