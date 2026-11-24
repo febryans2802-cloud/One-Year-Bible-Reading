@@ -1,0 +1,291 @@
+(() => {
+  const STORE_KEY = "oybr:v1";
+  const DAY_MS = 86400000;
+  const $ = (s) => document.querySelector(s);
+
+  // ---------- State ----------
+  function todayISO() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+  const defaults = () => ({ plan: "balanced", start: todayISO(), version: "NIV", theme: "auto", progress: {}, notes: {} });
+
+  function load() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(STORE_KEY));
+      if (raw && typeof raw === "object") return Object.assign(defaults(), raw);
+    } catch (_) {}
+    return defaults();
+  }
+  let state = load();
+  function save() {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (_) { toast("Could not save – storage unavailable"); }
+  }
+
+  // progress[plan] = { "<day>:<trackId>": true }
+  const prog = () => (state.progress[state.plan] ||= {});
+  const notes = () => (state.notes[state.plan] ||= {});
+
+  // ---------- Dates ----------
+  const parseISO = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+  const dateForDay = (i) => new Date(parseISO(state.start).getTime() + i * DAY_MS + 12 * 3600000); // noon avoids DST edges
+  function todayIndex() {
+    const t = parseISO(todayISO()).getTime();
+    return Math.round((t - parseISO(state.start).getTime()) / DAY_MS);
+  }
+  const clampDay = (i) => Math.max(0, Math.min(PLAN_DAYS - 1, i));
+  const fmt = (d, opts) => d.toLocaleDateString(undefined, opts);
+
+  // ---------- Plan helpers ----------
+  const plan = () => buildPlan(state.plan);
+  const isTrackDone = (d, t) => !!prog()[`${d}:${t}`];
+  const dayStatus = (d) => {
+    const tracks = plan()[d];
+    const n = tracks.filter((t) => isTrackDone(d, t.trackId)).length;
+    return n === 0 ? "none" : n === tracks.length ? "done" : "part";
+  };
+
+  function stats() {
+    const p = plan();
+    let readCh = 0, totalCh = 0, doneDays = 0;
+    p.forEach((tracks, d) => {
+      tracks.forEach((t) => { totalCh += t.chapters; if (isTrackDone(d, t.trackId)) readCh += t.chapters; });
+      if (dayStatus(d) === "done") doneDays++;
+    });
+    const ti = todayIndex();
+    let behind = 0;
+    for (let d = 0; d < Math.min(ti, PLAN_DAYS); d++) if (dayStatus(d) !== "done") behind++;
+    // Streak: consecutive completed plan days ending at today (or yesterday if today not done yet).
+    let streak = 0, d = clampDay(ti);
+    if (ti >= 0 && ti < PLAN_DAYS && dayStatus(d) !== "done") d--;
+    while (d >= 0 && dayStatus(d) === "done") { streak++; d--; }
+    return { pct: totalCh ? Math.round((readCh / totalCh) * 1000) / 10 : 0, doneDays, behind, streak, readCh };
+  }
+
+  // ---------- Rendering ----------
+  let current = clampDay(todayIndex());
+
+  function renderStats() {
+    const s = stats();
+    $("#stat-pct").textContent = `${s.pct}%`;
+    $("#stat-days").textContent = s.doneDays;
+    $("#stat-streak").textContent = s.streak;
+    $("#stat-behind").textContent = s.behind;
+    $("#stat-behind").parentElement.classList.toggle("warn", s.behind > 0);
+    $("#progress-bar").style.width = `${s.pct}%`;
+    return s;
+  }
+
+  function passageURL(q) {
+    return `https://www.biblegateway.com/passage/?search=${encodeURIComponent(q)}&version=${encodeURIComponent(state.version)}`;
+  }
+
+  function renderDay() {
+    const d = current, tracks = plan()[d], ti = todayIndex();
+    $("#day-heading").textContent = `Day ${d + 1} of ${PLAN_DAYS}`;
+    let rel = "";
+    if (d === ti) rel = " · Today";
+    else if (d === ti - 1) rel = " · Yesterday";
+    else if (d === ti + 1) rel = " · Tomorrow";
+    $("#day-date").textContent = fmt(dateForDay(d), { weekday: "long", year: "numeric", month: "long", day: "numeric" }) + rel;
+    $("#prev-day").disabled = d === 0;
+    $("#next-day").disabled = d === PLAN_DAYS - 1;
+
+    const ul = $("#readings");
+    ul.innerHTML = "";
+    tracks.forEach((t) => {
+      const done = isTrackDone(d, t.trackId);
+      const li = document.createElement("li");
+      li.className = "reading" + (done ? " done" : "");
+      const id = `chk-${t.trackId}`;
+      li.innerHTML = `
+        <input type="checkbox" id="${id}" ${done ? "checked" : ""}>
+        <label for="${id}" class="reading-body">
+          <span class="track">${t.trackName} · ${t.chapters} ch.</span>
+          <span class="passages"></span>
+        </label>`;
+      const ps = li.querySelector(".passages");
+      t.passages.forEach((p, i) => {
+        const a = document.createElement("a");
+        a.href = passageURL(p.query);
+        a.target = "_blank";
+        a.rel = "noopener";
+        a.textContent = p.label;
+        a.title = `Read ${p.label} (${state.version})`;
+        if (i) ps.append("; ");
+        ps.append(a);
+      });
+      li.querySelector("input").addEventListener("change", (e) => setTrack(d, t.trackId, e.target.checked));
+      ul.append(li);
+    });
+
+    const status = dayStatus(d);
+    $("#mark-day").textContent = status === "done" ? "Mark day as unread" : "Mark whole day as read";
+    $("#mark-day").classList.toggle("done", status === "done");
+    $("#day-notes").value = notes()[d] || "";
+
+    const s = renderStats();
+    const banner = $("#behind-banner");
+    if (ti < 0) {
+      banner.textContent = `Your plan starts in ${-ti} day${ti === -1 ? "" : "s"}. You can read ahead anytime.`;
+      banner.classList.remove("hidden");
+    } else if (ti >= PLAN_DAYS) {
+      banner.textContent = s.doneDays === PLAN_DAYS ? "You finished the whole Bible. Well done!" : `Your 365 days are over and ${PLAN_DAYS - s.doneDays} day(s) are still unread. Keep going!`;
+      banner.classList.remove("hidden");
+    } else if (s.behind > 0 && d === ti) {
+      banner.textContent = `You're ${s.behind} day${s.behind === 1 ? "" : "s"} behind. Tap “First unread day” to catch up, or move your start date in Settings.`;
+      banner.classList.remove("hidden");
+    } else banner.classList.add("hidden");
+  }
+
+  function renderCalendar() {
+    const root = $("#calendar");
+    root.innerHTML = "";
+    const ti = todayIndex(), p = plan();
+    let monthKey = null, grid = null;
+    for (let d = 0; d < PLAN_DAYS; d++) {
+      const date = dateForDay(d);
+      const key = `${date.getFullYear()}-${date.getMonth()}`;
+      if (key !== monthKey) {
+        monthKey = key;
+        const box = document.createElement("div");
+        box.className = "month";
+        box.innerHTML = `<h3>${fmt(date, { month: "long", year: "numeric" })}</h3>`;
+        grid = document.createElement("div");
+        grid.className = "grid";
+        ["S", "M", "T", "W", "T", "F", "S"].forEach((w) => { const h = document.createElement("span"); h.className = "wd"; h.textContent = w; grid.append(h); });
+        for (let i = 0; i < date.getDay(); i++) grid.append(document.createElement("span"));
+        box.append(grid);
+        root.append(box);
+      }
+      const st = dayStatus(d);
+      const b = document.createElement("button");
+      b.className = `cell ${st}` + (d === ti ? " today" : "") + (st !== "done" && d < ti ? " missed" : "") + (d === current ? " selected" : "");
+      b.textContent = date.getDate();
+      b.title = `Day ${d + 1}: ` + p[d].map((t) => t.passages.map((x) => x.label).join("; ")).join(" | ");
+      b.addEventListener("click", () => { current = d; show("today"); });
+      grid.append(b);
+    }
+  }
+
+  function renderSettings() {
+    const sel = $("#plan-select");
+    if (!sel.options.length) {
+      Object.entries(PLANS).forEach(([id, p]) => sel.add(new Option(p.name, id)));
+    }
+    sel.value = state.plan;
+    $("#start-date").value = state.start;
+    $("#version-select").value = state.version;
+    $("#theme-select").value = state.theme;
+  }
+
+  function applyTheme() {
+    if (state.theme === "auto") document.documentElement.removeAttribute("data-theme");
+    else document.documentElement.setAttribute("data-theme", state.theme);
+  }
+
+  let view = "today";
+  function show(v) {
+    view = v;
+    document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.dataset.view === v));
+    document.querySelectorAll(".view").forEach((s) => s.classList.toggle("hidden", s.id !== `view-${v}`));
+    if (v === "today") renderDay();
+    if (v === "calendar") { renderStats(); renderCalendar(); }
+    if (v === "settings") { renderStats(); renderSettings(); }
+    window.scrollTo({ top: 0 });
+  }
+
+  // ---------- Actions ----------
+  function setTrack(d, trackId, val) {
+    const k = `${d}:${trackId}`;
+    if (val) prog()[k] = true; else delete prog()[k];
+    save();
+    const nowDone = dayStatus(d) === "done";
+    renderDay();
+    if (val && nowDone) toast(`Day ${d + 1} complete ✓`);
+  }
+
+  function toggleDay() {
+    const d = current, done = dayStatus(d) === "done";
+    plan()[d].forEach((t) => { const k = `${d}:${t.trackId}`; if (done) delete prog()[k]; else prog()[k] = true; });
+    save();
+    renderDay();
+    if (!done) toast(`Day ${d + 1} complete ✓`);
+  }
+
+  function firstUnread() {
+    for (let d = 0; d < PLAN_DAYS; d++) if (dayStatus(d) !== "done") return d;
+    return PLAN_DAYS - 1;
+  }
+
+  let toastTimer;
+  function toast(msg) {
+    const t = $("#toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove("show"), 2200);
+  }
+
+  // ---------- Wiring ----------
+  document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => show(t.dataset.view)));
+  $("#prev-day").addEventListener("click", () => { current = clampDay(current - 1); renderDay(); });
+  $("#next-day").addEventListener("click", () => { current = clampDay(current + 1); renderDay(); });
+  $("#goto-today").addEventListener("click", () => { current = clampDay(todayIndex()); renderDay(); });
+  $("#goto-unread").addEventListener("click", () => { current = firstUnread(); renderDay(); });
+  $("#mark-day").addEventListener("click", toggleDay);
+
+  let notesTimer;
+  $("#day-notes").addEventListener("input", (e) => {
+    const d = current, v = e.target.value;
+    clearTimeout(notesTimer);
+    notesTimer = setTimeout(() => { if (v.trim()) notes()[d] = v; else delete notes()[d]; save(); }, 300);
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (view !== "today" || /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+    if (e.key === "ArrowLeft") $("#prev-day").click();
+    if (e.key === "ArrowRight") $("#next-day").click();
+  });
+
+  $("#plan-select").addEventListener("change", (e) => { state.plan = e.target.value; save(); renderStats(); toast("Plan changed"); });
+  $("#start-date").addEventListener("change", (e) => {
+    if (!e.target.value) return;
+    state.start = e.target.value; save(); current = clampDay(todayIndex()); renderStats(); toast("Start date updated");
+  });
+  $("#version-select").addEventListener("change", (e) => { state.version = e.target.value; save(); toast(`Links now open in ${state.version}`); });
+  $("#theme-select").addEventListener("change", (e) => { state.theme = e.target.value; save(); applyTheme(); });
+
+  $("#export-btn").addEventListener("click", () => {
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `bible-reading-progress-${todayISO()}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+  $("#import-file").addEventListener("change", async (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    try {
+      const data = JSON.parse(await f.text());
+      if (!data || typeof data.progress !== "object") throw new Error("bad file");
+      state = Object.assign(defaults(), data);
+      save(); applyTheme(); current = clampDay(todayIndex()); renderSettings(); renderStats();
+      toast("Progress imported");
+    } catch (_) { toast("That file doesn't look like a progress backup"); }
+    e.target.value = "";
+  });
+  $("#reset-btn").addEventListener("click", () => {
+    if (!confirm(`Clear all checkmarks and notes for “${PLANS[state.plan].name}”?`)) return;
+    state.progress[state.plan] = {}; state.notes[state.plan] = {};
+    save(); renderStats(); toast("Progress reset");
+  });
+
+  // Re-render when the date rolls over while the tab stays open.
+  let lastDay = todayISO();
+  setInterval(() => { if (todayISO() !== lastDay) { lastDay = todayISO(); show(view); } }, 60000);
+
+  applyTheme();
+  show("today");
+})();

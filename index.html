@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>One Year Bible Reading</title>
+  <meta name="description" content="Read through the whole Bible in 365 days. Track progress, keep notes, and catch up when you fall behind.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>One Year Bible</h1>
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-view="today" role="tab">Today</button>
+      <button class="tab" data-view="calendar" role="tab">Plan</button>
+      <button class="tab" data-view="settings" role="tab">Settings</button>
+    </nav>
+  </header>
+
+  <main>
+    <section class="stats" aria-label="Progress">
+      <div class="stat"><span id="stat-pct" class="big">0%</span><span class="label">of the Bible</span></div>
+      <div class="stat"><span id="stat-days" class="big">0</span><span class="label">days done</span></div>
+      <div class="stat"><span id="stat-streak" class="big">0</span><span class="label">day streak</span></div>
+      <div class="stat"><span id="stat-behind" class="big">0</span><span class="label">days behind</span></div>
+      <div class="progress" aria-hidden="true"><div id="progress-bar"></div></div>
+    </section>
+
+    <!-- TODAY / DAY DETAIL -->
+    <section id="view-today" class="view">
+      <div class="day-nav">
+        <button id="prev-day" class="icon-btn" aria-label="Previous day">‹</button>
+        <div class="day-title">
+          <h2 id="day-heading">Day 1</h2>
+          <p id="day-date" class="muted"></p>
+        </div>
+        <button id="next-day" class="icon-btn" aria-label="Next day">›</button>
+      </div>
+      <div class="quick">
+        <button id="goto-today" class="chip">Jump to today</button>
+        <button id="goto-unread" class="chip">First unread day</button>
+      </div>
+      <div id="behind-banner" class="banner hidden"></div>
+      <ul id="readings" class="readings"></ul>
+      <button id="mark-day" class="primary">Mark whole day as read</button>
+      <label class="notes">
+        <span>Notes &amp; reflections for this day</span>
+        <textarea id="day-notes" rows="5" placeholder="What stood out to you?"></textarea>
+      </label>
+    </section>
+
+    <!-- CALENDAR -->
+    <section id="view-calendar" class="view hidden">
+      <p class="muted">Tap any day to open it. <span class="legend"><i class="sw done"></i>read <i class="sw part"></i>partly read <i class="sw missed"></i>missed <i class="sw today"></i>today</span></p>
+      <div id="calendar"></div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section id="view-settings" class="view hidden">
+      <div class="field">
+        <label for="plan-select">Reading plan</label>
+        <select id="plan-select"></select>
+        <p class="hint">Changing plan keeps your progress for each plan separately.</p>
+      </div>
+      <div class="field">
+        <label for="start-date">Start date (Day 1)</label>
+        <input type="date" id="start-date">
+        <p class="hint">Start any day of the year; the plan runs for 365 days from here.</p>
+      </div>
+      <div class="field">
+        <label for="version-select">Bible version for reading links</label>
+        <select id="version-select">
+          <option value="NIV">NIV – New International Version</option>
+          <option value="ESV">ESV – English Standard Version</option>
+          <option value="NLT">NLT – New Living Translation</option>
+          <option value="KJV">KJV – King James Version</option>
+          <option value="NKJV">NKJV – New King James Version</option>
+          <option value="NASB">NASB – New American Standard Bible</option>
+          <option value="CUV">CUV – 和合本 (繁體)</option>
+          <option value="CUVS">CUVS – 和合本 (简体)</option>
+          <option value="CNVT">CNVT – 新譯本 (繁體)</option>
+        </select>
+        <p class="hint">Passages open on BibleGateway.com in a new tab.</p>
+      </div>
+      <div class="field">
+        <label>Theme</label>
+        <select id="theme-select">
+          <option value="auto">Match system</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Backup</label>
+        <div class="row">
+          <button id="export-btn" class="secondary">Export progress</button>
+          <label class="secondary file-btn">Import progress<input type="file" id="import-file" accept="application/json" hidden></label>
+        </div>
+        <p class="hint">Progress is saved in this browser only. Export to move it to another device.</p>
+      </div>
+      <div class="field danger">
+        <button id="reset-btn" class="secondary">Reset progress for this plan</button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="muted">Read the whole Bible in a year, a few chapters a day.</footer>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="js/bible.js"></script>
+  <script src="js/plans.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
