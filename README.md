@@ -15,7 +15,7 @@ A small interactive website for reading the whole Bible (all 1,189 chapters) in 
   - NET Bible translators' notes, Enduring Word (David Guzik), Matthew Henry, and Bible Hub's page of about 20 classic commentaries
   - 中文: 信望愛 (FHL) CBOL 註釋 and 和合本 with original-language tools
 - **Book background**: when a book begins, a card gives its author, date, setting, summary, themes and a key passage, with BibleProject overview videos and 查經資料大全 (ccbiblestudy.org). It is also available inside each Study panel.
-- Settings choose English, 中文, or both for study links.
+- Book background is available in English and 繁體中文. Settings choose English, 中文, or both. With both, each card has its own language switch.
 - Any start date, light/dark theme, and JSON export/import of progress.
 
 Progress is stored in the browser's `localStorage`, so it doesn't sync between devices unless you export and import it.
@@ -38,4 +38,4 @@ Repository **Settings → Pages → Deploy from a branch**, then select the bran
 - `js/study.js` holds the URL data for each book (Chinese names and abbreviations, site slugs, BibleProject video slugs taken from bibleproject.com's sitemap).
 - The links for chapter 1 and the last chapter of every book (904 URLs), plus a sample of middle chapters, were checked against the live sites. Each link had to load the correct page, not a 404 or a redirect to a homepage. If a site changes its URL scheme, update the patterns in `STUDY.chapterLinks` / `STUDY.bookLinks`.
 - No commentary text is copied into this site. Every resource is a link, so the publishers' copyrights are respected.
-- `js/intros.js` contains original short book introductions. Where authorship or dating is debated, both the traditional and the main scholarly view are given. Review them before relying on them.
+- `js/intros.js` (English) and `js/intros-zh.js` (繁體中文) contain original short book introductions; the Chinese follows 和合本 names and terms. Where authorship or dating is debated, both the traditional and the main scholarly view are given. Review them before relying on them.

@@ -131,8 +131,8 @@ footer { text-align: center; font-size: .85rem; padding: 32px 16px; }
 .intro.start { border-color: var(--accent); background: var(--accent-soft); box-shadow: var(--shadow); }
 .intro summary { cursor: pointer; padding: 12px 0; list-style: none; display: flex; flex-direction: column; }
 .intro summary::-webkit-details-marker { display: none; }
-.intro summary::after { content: "Read background ▾"; font-size: .8rem; color: var(--accent); margin-top: 2px; }
-.intro[open] summary::after { content: "Hide ▴"; }
+.intro summary::after { content: attr(data-more); font-size: .8rem; color: var(--accent); margin-top: 2px; }
+.intro[open] summary::after { content: attr(data-less); }
 .intro-kicker { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .intro-title { font: 600 1.1rem/1.3 Georgia, serif; }
 .intro-summary { margin-top: 4px; font-size: .95rem; }
@@ -158,3 +158,6 @@ footer { text-align: center; font-size: .85rem; padding: 32px 16px; }
 .res-key .links li { gap: 0 8px; }
 .study { grid-template-columns: minmax(0, 1fr); }
 .reading > * { min-width: 0; }
+.lang-switch { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; padding: 2px; margin-bottom: 10px; background: var(--surface); }
+.lang-switch button { border: 0; background: none; color: var(--muted); padding: 2px 12px; border-radius: 999px; font-size: .82rem; }
+.lang-switch button.active { background: var(--accent); color: var(--accent-ink); }

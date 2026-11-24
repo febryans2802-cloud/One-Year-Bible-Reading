@@ -217,27 +217,52 @@
     return panel;
   }
 
+  const INTRO_LABELS = {
+    en: { start: "Starting a new book", bg: "Book background", more: "Read background ▾", less: "Hide ▴",
+          author: "Author", date: "Date", setting: "Setting", key: "Key passage", themes: "Major themes", watch: "Watch", zhRes: "中文資源",
+          note: "Background notes are brief summaries. Where authorship or dating is debated, both views are given." },
+    zh: { start: "開始新的一卷書", bg: "書卷背景", more: "閱讀背景 ▾", less: "收起 ▴",
+          author: "作者", date: "年代", setting: "背景", key: "鑰節", themes: "主要信息", watch: "影片（英文）", zhRes: "中文資源",
+          note: "以上為簡要介紹。作者或年代有爭議之處，並列傳統看法與學術看法。" },
+  };
+  // Language for background cards: follows the study setting; in "both" mode the reader can switch.
+  const introLang = () => (state.studyLang === "both" ? state.introLang || "zh" : state.studyLang);
+
   function buildIntro(bi, startOfBook) {
-    const book = BIBLE_BOOKS[bi], intro = BOOK_INTROS[bi], links = STUDY.bookLinks(bi);
+    const book = BIBLE_BOOKS[bi], links = STUDY.bookLinks(bi);
+    const lang = introLang(), L = INTRO_LABELS[lang];
+    const intro = (lang === "zh" ? BOOK_INTROS_ZH : BOOK_INTROS)[bi];
     const det = el("details", "intro" + (startOfBook ? " start" : ""));
     det.open = openIntros.has(`${startOfBook}:${bi}`);
     det.addEventListener("toggle", () => { const k = `${startOfBook}:${bi}`; if (det.open) openIntros.add(k); else openIntros.delete(k); });
     const sum = el("summary");
-    sum.append(el("span", "intro-kicker", startOfBook ? "Starting a new book" : "Book background"));
-    sum.append(el("span", "intro-title", `${book.name} · ${STUDY_BOOKS[bi].zh}`));
+    sum.dataset.more = L.more; sum.dataset.less = L.less;
+    sum.append(el("span", "intro-kicker", startOfBook ? L.start : L.bg));
+    sum.append(el("span", "intro-title", lang === "zh" ? `${STUDY_BOOKS[bi].zh} · ${book.name}` : `${book.name} · ${STUDY_BOOKS[bi].zh}`));
     sum.append(el("span", "intro-summary", intro.summary));
     det.append(sum);
+    if (state.studyLang === "both") {
+      const sw = el("div", "lang-switch");
+      [["en", "English"], ["zh", "中文"]].forEach(([code, name]) => {
+        const b = el("button", code === lang ? "active" : "", name);
+        b.type = "button";
+        b.setAttribute("aria-pressed", code === lang);
+        b.addEventListener("click", () => { if (code === lang) return; state.introLang = code; save(); renderDay(); });
+        sw.append(b);
+      });
+      det.append(sw);
+    }
     const dl = el("dl");
-    [["Author", intro.author], ["Date", intro.date], ["Setting", intro.setting], ["Key passage", intro.key]].forEach(([k, v]) => {
+    [[L.author, intro.author], [L.date, intro.date], [L.setting, intro.setting], [L.key, intro.key]].forEach(([k, v]) => {
       dl.append(el("dt", null, k), el("dd", null, v));
     });
     det.append(dl);
     const themes = el("ul", "themes");
     intro.themes.forEach((t) => themes.append(el("li", null, t)));
-    det.append(el("p", "lang-label", "Major themes"), themes);
-    if (showEn()) det.append(el("p", "lang-label", "Watch"), linkList(links.videos));
-    if (showZh()) { const zh = linkList(links.zh); zh.classList.add("zh"); det.append(el("p", "lang-label", "中文資源"), zh); }
-    det.append(el("p", "intro-disclaimer", "Background notes are brief summaries. Where authorship or dating is debated, both views are given."));
+    det.append(el("p", "lang-label", L.themes), themes);
+    if (showEn()) det.append(el("p", "lang-label", L.watch), linkList(links.videos));
+    if (showZh()) { const zh = linkList(links.zh); zh.classList.add("zh"); det.append(el("p", "lang-label", L.zhRes), zh); }
+    det.append(el("p", "intro-disclaimer", L.note));
     return det;
   }
 
