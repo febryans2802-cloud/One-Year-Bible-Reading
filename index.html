@@ -41,6 +41,7 @@
         <button id="goto-unread" class="chip">First unread day</button>
       </div>
       <div id="behind-banner" class="banner hidden"></div>
+      <div id="book-starts"></div>
       <ul id="readings" class="readings"></ul>
       <button id="mark-day" class="primary">Mark whole day as read</button>
       <label class="notes">
@@ -83,7 +84,16 @@
         <p class="hint">Passages open on BibleGateway.com in a new tab.</p>
       </div>
       <div class="field">
-        <label>Theme</label>
+        <label for="study-lang">Study resources</label>
+        <select id="study-lang">
+          <option value="both">English and 中文</option>
+          <option value="en">English only</option>
+          <option value="zh">中文 only</option>
+        </select>
+        <p class="hint">Which commentary and background links appear under “Study”.</p>
+      </div>
+      <div class="field">
+        <label for="theme-select">Theme</label>
         <select id="theme-select">
           <option value="auto">Match system</option>
           <option value="light">Light</option>
@@ -109,6 +119,8 @@
 
   <script src="js/bible.js"></script>
   <script src="js/plans.js"></script>
+  <script src="js/study.js"></script>
+  <script src="js/intros.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

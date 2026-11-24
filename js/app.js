@@ -8,7 +8,7 @@
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   }
-  const defaults = () => ({ plan: "balanced", start: todayISO(), version: "NIV", theme: "auto", progress: {}, notes: {} });
+  const defaults = () => ({ plan: "balanced", start: todayISO(), version: "NIV", theme: "auto", studyLang: "both", progress: {}, notes: {} });
 
   function load() {
     try {
@@ -98,12 +98,26 @@
       const li = document.createElement("li");
       li.className = "reading" + (done ? " done" : "");
       const id = `chk-${t.trackId}`;
+      const studyKey = `${d}:${t.trackId}`;
+      const open = openStudy.has(studyKey);
       li.innerHTML = `
-        <input type="checkbox" id="${id}" ${done ? "checked" : ""}>
-        <label for="${id}" class="reading-body">
-          <span class="track">${t.trackName} · ${t.chapters} ch.</span>
-          <span class="passages"></span>
-        </label>`;
+        <div class="reading-main">
+          <input type="checkbox" id="${id}" ${done ? "checked" : ""}>
+          <label for="${id}" class="reading-body">
+            <span class="track">${t.trackName} · ${t.chapters} ch.</span>
+            <span class="passages"></span>
+          </label>
+          <button class="study-btn" aria-expanded="${open}">Study</button>
+        </div>`;
+      const panel = buildStudyPanel(t.passages);
+      panel.hidden = !open;
+      li.append(panel);
+      li.querySelector(".study-btn").addEventListener("click", (e) => {
+        const nowOpen = panel.hidden;
+        panel.hidden = !nowOpen;
+        e.currentTarget.setAttribute("aria-expanded", nowOpen);
+        if (nowOpen) openStudy.add(studyKey); else openStudy.delete(studyKey);
+      });
       const ps = li.querySelector(".passages");
       t.passages.forEach((p, i) => {
         const a = document.createElement("a");
@@ -118,6 +132,8 @@
       li.querySelector("input").addEventListener("change", (e) => setTrack(d, t.trackId, e.target.checked));
       ul.append(li);
     });
+
+    renderBookStarts(tracks);
 
     const status = dayStatus(d);
     $("#mark-day").textContent = status === "done" ? "Mark day as unread" : "Mark whole day as read";
@@ -136,6 +152,100 @@
       banner.textContent = `You're ${s.behind} day${s.behind === 1 ? "" : "s"} behind. Tap “First unread day” to catch up, or move your start date in Settings.`;
       banner.classList.remove("hidden");
     } else banner.classList.add("hidden");
+  }
+
+  // ---------- Study helpers ----------
+  const openStudy = new Set();
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function linkList(links) {
+    const ul = el("ul", "links");
+    links.forEach((l) => {
+      const li = el("li");
+      const a = el("a", null, l.name);
+      a.href = l.url; a.target = "_blank"; a.rel = "noopener";
+      li.append(a);
+      if (l.note) li.append(el("span", "link-note", l.note));
+      ul.append(li);
+    });
+    return ul;
+  }
+  const showEn = () => state.studyLang !== "zh";
+  const showZh = () => state.studyLang !== "en";
+
+  function inlineLinks(links) {
+    const row = el("p", "link-row");
+    links.forEach((l, i) => {
+      if (i) row.append(" ", el("span", "sep", "·"), " ");
+      const a = el("a", null, l.name);
+      a.href = l.url; a.target = "_blank"; a.rel = "noopener"; a.title = l.note || l.name;
+      row.append(a);
+    });
+    return row;
+  }
+
+  function resourceKey() {
+    const det = el("details", "res-key");
+    det.append(el("summary", null, "About these resources"));
+    const sample = STUDY.chapterLinks(0, 1);
+    const items = [...(showEn() ? sample.en : []), ...(showZh() ? sample.zh : [])].map((l) => ({ name: l.name, note: l.note }));
+    const ul = el("ul", "links");
+    items.forEach((l) => { const li = el("li"); li.append(el("strong", null, l.name), el("span", "link-note", l.note)); ul.append(li); });
+    det.append(ul);
+    return det;
+  }
+
+  function buildStudyPanel(passages) {
+    const panel = el("div", "study");
+    passages.forEach((p) => {
+      const book = BIBLE_BOOKS[p.bi];
+      for (let c = p.from; c <= p.to; c++) {
+        const links = STUDY.chapterLinks(p.bi, c);
+        const box = el("div", "study-chapter");
+        box.append(el("h4", null, book.chapters === 1 ? book.name : `${book.name} ${c}`));
+        if (showEn()) box.append(inlineLinks(links.en));
+        if (showZh()) { const zh = inlineLinks(links.zh); zh.classList.add("zh"); box.append(zh); }
+        panel.append(box);
+      }
+      panel.append(buildIntro(p.bi, false));
+    });
+    panel.append(resourceKey());
+    return panel;
+  }
+
+  function buildIntro(bi, startOfBook) {
+    const book = BIBLE_BOOKS[bi], intro = BOOK_INTROS[bi], links = STUDY.bookLinks(bi);
+    const det = el("details", "intro" + (startOfBook ? " start" : ""));
+    det.open = openIntros.has(`${startOfBook}:${bi}`);
+    det.addEventListener("toggle", () => { const k = `${startOfBook}:${bi}`; if (det.open) openIntros.add(k); else openIntros.delete(k); });
+    const sum = el("summary");
+    sum.append(el("span", "intro-kicker", startOfBook ? "Starting a new book" : "Book background"));
+    sum.append(el("span", "intro-title", `${book.name} · ${STUDY_BOOKS[bi].zh}`));
+    sum.append(el("span", "intro-summary", intro.summary));
+    det.append(sum);
+    const dl = el("dl");
+    [["Author", intro.author], ["Date", intro.date], ["Setting", intro.setting], ["Key passage", intro.key]].forEach(([k, v]) => {
+      dl.append(el("dt", null, k), el("dd", null, v));
+    });
+    det.append(dl);
+    const themes = el("ul", "themes");
+    intro.themes.forEach((t) => themes.append(el("li", null, t)));
+    det.append(el("p", "lang-label", "Major themes"), themes);
+    if (showEn()) det.append(el("p", "lang-label", "Watch"), linkList(links.videos));
+    if (showZh()) { const zh = linkList(links.zh); zh.classList.add("zh"); det.append(el("p", "lang-label", "中文資源"), zh); }
+    det.append(el("p", "intro-disclaimer", "Background notes are brief summaries. Where authorship or dating is debated, both views are given."));
+    return det;
+  }
+
+  const openIntros = new Set();
+  function renderBookStarts(tracks) {
+    const box = $("#book-starts");
+    box.innerHTML = "";
+    tracks.forEach((t) => t.passages.forEach((p) => { if (p.from === 1) box.append(buildIntro(p.bi, true)); }));
   }
 
   function renderCalendar() {
@@ -177,6 +287,7 @@
     $("#start-date").value = state.start;
     $("#version-select").value = state.version;
     $("#theme-select").value = state.theme;
+    $("#study-lang").value = state.studyLang;
   }
 
   function applyTheme() {
@@ -254,6 +365,7 @@
     state.start = e.target.value; save(); current = clampDay(todayIndex()); renderStats(); toast("Start date updated");
   });
   $("#version-select").addEventListener("change", (e) => { state.version = e.target.value; save(); toast(`Links now open in ${state.version}`); });
+  $("#study-lang").addEventListener("change", (e) => { state.studyLang = e.target.value; save(); toast("Study links updated"); });
   $("#theme-select").addEventListener("change", (e) => { state.theme = e.target.value; save(); applyTheme(); });
 
   $("#export-btn").addEventListener("click", () => {
